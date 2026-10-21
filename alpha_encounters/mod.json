@@ -1,0 +1,26 @@
+{"name":"Alpha Encounters","id":"alpha_encounters","version":"1.0.0","author":"CharmingLoopy","description":"Adds catchable alpha pokemon.","tags":["Difficulty","Gameplay","Content"],"dependencies":[],"incompatible":[],
+    "settings": [
+    {
+      "key": "alpha_encounterchance",
+      "label": "Alpha Encounter Chance",
+      "type": "int",
+      "default": 1,
+      "min": 1,
+      "max": 100
+    },
+    {
+      "key": "alpha_trainer",
+      "label": "Trainer Alphas",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "alpha_trainerchance",
+      "label": "Trainer Alpha Pokemon Chance",
+      "type": "int",
+      "default": 1,
+      "min": 1,
+      "max": 100
+    }
+  ]
+,"scripts":["Bootstrap.rb"],"icon":"icon.png"}
