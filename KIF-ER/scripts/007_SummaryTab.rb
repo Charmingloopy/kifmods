@@ -368,9 +368,14 @@ class PokemonSummary_Scene
     return true
   end
 
+  # Fusion innate picker (Cody's mockup, 2026-10-21): the 6 innates grouped by
+  # head / body on the right, the highlighted one's full text on the left
+  # (Left/Right pages long texts). Any number can be ticked; Done saves only
+  # with exactly 3 (grey under, red over; Cody 2026-10-21)
   def kifer_pick_innates
     head = @pokemon.get_head_species.id
-    pool = KIFER.fusion_pool(head, @pokemon.get_body_species.id)
+    body = @pokemon.get_body_species.id
+    pool = KIFER.fusion_pool(head, body)
     head_n = KIFER.species_innates(head).length
     want = [3, pool.length].min
     # ticked slots (pool indexes); an innate both parents have is two slots
@@ -379,30 +384,157 @@ class PokemonSummary_Scene
       i = (0...pool.length).find { |k| pool[k] == id && !chosen.include?(k) }
       chosen << i if i
     end
-    idx = 0
+    names = [GameData::Species.get(head).name, GameData::Species.get(body).name]
+    sel = 0
+    tpage = 0
+    pages = kifer_draw_innate_picker(pool, head_n, names, chosen, want, sel, tpage)
     loop do
-      cmds = pool.each_with_index.map do |id, k|
-        mark = chosen.include?(k) ? "[x] " : "[  ] "
-        mark + KIFER.ability_name(id) + (k < head_n ? _INTL(" (head)") : _INTL(" (body)"))
-      end
-      cmds << _INTL("Done")
-      c = pbShowCommands(cmds, idx)
-      return false if c.nil? || c < 0
-      idx = c
-      if c == pool.length
-        if chosen.length == want
-          @pokemon.kifer_pick = chosen.sort.map { |k| pool[k] }
-          return true
+      Graphics.update
+      Input.update
+      pbUpdate
+      n = pool.length + 1     # + Done
+      redraw = false
+      if Input.trigger?(Input::BACK)
+        pbPlayCloseMenuSE
+        return false
+      elsif Input.trigger?(Input::UP)
+        sel = (sel - 1) % n; tpage = 0; pbPlayCursorSE; redraw = true
+      elsif Input.trigger?(Input::DOWN)
+        sel = (sel + 1) % n; tpage = 0; pbPlayCursorSE; redraw = true
+      elsif Input.trigger?(Input::LEFT) && tpage > 0
+        tpage -= 1; pbPlayCursorSE; redraw = true
+      elsif Input.trigger?(Input::RIGHT) && tpage < pages - 1
+        tpage += 1; pbPlayCursorSE; redraw = true
+      elsif Input.trigger?(Input::USE)
+        if sel == pool.length
+          if chosen.length == want
+            pbPlayDecisionSE
+            @pokemon.kifer_pick = chosen.sort.map { |k| pool[k] }
+            return true
+          end
+          pbPlayBuzzerSE
+          pbDisplay(_INTL("Pick {1} innates.", want))
+        elsif chosen.include?(sel)
+          pbPlayCursorSE
+          chosen.delete(sel)
+        else
+          pbPlayDecisionSE
+          chosen << sel
         end
-        pbDisplay(_INTL("Pick {1} innates.", want))
-      elsif chosen.include?(c)
-        chosen.delete(c)
-      elsif chosen.length < want
-        chosen << c
-      else
-        pbDisplay(_INTL("Take one off first."))
+        redraw = true
+      end
+      pages = kifer_draw_innate_picker(pool, head_n, names, chosen, want, sel, tpage) if redraw
+    end
+  end
+
+  # Text centred in a box with KIF's pixel font (KIF::PixelFont, the KIF
+  # Settings screen's text: crisp, and placed by its real height); older KIF:
+  # the engine's text. font: :title / :row / :text; align 0 left, 1 right, 2 centre
+  def kifer_px(b, x, y, w, h, str, base, shade, font, align = 0)
+    str = str.to_s
+    if defined?(KIF::PixelFont) && KIF::PixelFont.respond_to?(:draw) && KIF::PixelFont.const_defined?(:TEXT)
+      f = { :title => KIF::PixelFont::TITLE, :row => KIF::PixelFont::ROW }[font] || KIF::PixelFont::TEXT
+      sw = KIF::PixelFont.width(f, str)
+      tx = align == 1 ? x + w - sw : (align == 2 ? x + (w - sw) / 2 : x)
+      # centre the capitals (glyph "A"), not the font's line height
+      cap = KIF::PixelFont.glyph(KIF::PixelFont.data(f), "A") rescue nil
+      ty = cap ? y + (h - cap[4]) / 2 - cap[2] : y + (h - KIF::PixelFont.height(f)) / 2
+      [[2, 0], [0, 2], [2, 2]].each { |dx, dy| KIF::PixelFont.draw(b, tx + dx, ty + dy, str, f, shade) }
+      KIF::PixelFont.draw(b, tx, ty, str, f, base)
+      return
+    end
+    font == :row ? pbSetNarrowFont(b) : (font == :title ? pbSetSystemFont(b) : pbSetSmallFont(b))
+    ax = align == 1 ? x + w : (align == 2 ? x + w / 2 : x)
+    pbDrawTextPositions(b, [[str, ax, y + (h - 26) / 2, align, base, shade]])
+    pbSetSystemFont(b)
+  end
+
+  # Returns the number of text pages on the left
+  def kifer_draw_innate_picker(pool, head_n, names, chosen, want, sel, tpage)
+    kifer_hook_background
+    @sprites["background"].setBitmap(KIFER::SummaryUI.gfx("bg_abil_detail"))
+    o = @sprites["overlay"].bitmap
+    o.clear
+    white = Color.new(248, 248, 248)
+    pbSetSystemFont(o)
+    pbDrawTextPositions(o, [[_INTL("ABILITIES"), 26, 10, 0, white, Color.new(104, 104, 104)]])
+    # left: the highlighted innate's text, or the picks while on Done
+    pages = 1
+    if sel < pool.length
+      id = pool[sel]
+      pbDrawTextPositions(o, [[KIFER.ability_name(id), 8, 68, 0, @text_color_base, @text_color_shadow]])
+      pbSetNarrowFont(o)
+      lines = KIFER::SummaryUI.wrap(o, KIFER.ability_full_text(id), 224)
+      per = KIFER::SummaryUI::LINES_PER_TEXT_PAGE
+      pages = [(lines.length + per - 1) / per, 1].max
+      tpage = [[tpage, 0].max, pages - 1].min
+      pbDrawTextPositions(o, lines[tpage * per, per].to_a.each_with_index.map { |l, i|
+        [l, 8, 108 + i * 26, 0, @text_color_base, @text_color_shadow] })
+    else
+      pbDrawTextPositions(o, [[_INTL("Your innates"), 8, 68, 0, @text_color_base, @text_color_shadow]])
+      chosen.sort.each_with_index do |k, i|
+        pbSetNarrowFont(o)
+        pbDrawTextPositions(o, [[KIFER.ability_name(pool[k]), 8, 108 + i * 52, 0, @text_color_base, @text_color_shadow]])
+        pbSetSmallFont(o)
+        short = KIFER::SummaryUI.wrap(o, ((KIFER::ABILITY_TEXT[pool[k]] || {})[:short] || (GameData::Ability.try_get(pool[k]) ? GameData::Ability.get(pool[k]).description : "")).to_s, 224)
+        line = short[0].to_s + (short.length > 1 ? "..." : "")
+        pbDrawTextPositions(o, [[line, 8, 132 + i * 52, 0, INNATES_GREY, INNATES_GREY_SHADE]])
       end
     end
+    hints = [sel < pool.length ? _INTL("C: tick") : _INTL("C: save"), _INTL("X: back")]
+    hints.unshift(_INTL("Page {1}/{2}", tpage + 1, pages)) if pages > 1
+    kifer_px(o, 8, 352, 230, 24, hints.join("   "), INNATES_GREY, INNATES_GREY_SHADE, :text)
+    # right: the picker panel
+    x0, y0, x1, y1 = 246, 62, 504, 380
+    dark = Color.new(64, 64, 72)
+    o.fill_rect(x0 - 2, y0 - 2, x1 - x0 + 5, y1 - y0 + 5, dark)
+    o.fill_rect(x0, y0, x1 - x0 + 1, y1 - y0 + 1, Color.new(224, 232, 232))
+    o.fill_rect(x0, y0, x1 - x0 + 1, 28, Color.new(112, 72, 200))
+    shade = Color.new(72, 40, 136)
+    kifer_px(o, x0 + 8, y0, 180, 28, _INTL("Pick {1} innates", want), white, shade, :title)
+    kifer_px(o, x1 - 68, y0, 60, 28, "#{chosen.length}/#{want}", white, shade, :title, 1)
+    green = Color.new(72, 168, 88)
+    orange = Color.new(248, 120, 32)
+    y = y0 + 31
+    groups = [[names[0], _INTL("head"), (0...head_n).to_a], [names[1], _INTL("body"), (head_n...pool.length).to_a]]
+    groups.each do |sp, part, ks|
+      next if ks.empty?
+      kifer_px(o, x0 + 8, y, x1 - x0 - 16, 20, _INTL("{1} ({2})", sp.upcase, part), INNATES_PURPLE, INNATES_PURPLE_SHADE, :text)
+      y += 21
+      ks.each do |k|
+        if k == sel
+          o.fill_rect(x0 + 3, y, x1 - x0 - 5, 3, orange)
+          o.fill_rect(x0 + 3, y + 25, x1 - x0 - 5, 3, orange)
+          o.fill_rect(x0 + 3, y, 3, 28, orange)
+          o.fill_rect(x1 - 5, y, 3, 28, orange)
+        end
+        bx, by = x0 + 12, y + 7
+        o.fill_rect(bx, by, 15, 15, Color.new(80, 80, 88))
+        o.fill_rect(bx + 2, by + 2, 11, 11, white)
+        o.fill_rect(bx + 3, by + 3, 9, 9, green) if chosen.include?(k)
+        coded = KIFER.coded?(pool[k])
+        kifer_px(o, x0 + 34, y + 3, x1 - x0 - 42, 22, KIFER.ability_name(pool[k]),
+                 coded ? @text_color_base : INNATES_GREY, coded ? @text_color_shadow : INNATES_GREY_SHADE, :row)
+        y += 28
+      end
+      y += 2
+    end
+    # Done: green with the right number ticked, grey under, red over
+    full = chosen.length == want
+    over = chosen.length > want
+    dy = y1 - 34
+    o.fill_rect(x0 + 60, dy, x1 - x0 - 119, 26, dark)
+    o.fill_rect(x0 + 62, dy + 2, x1 - x0 - 123, 22, full ? green : (over ? Color.new(208, 64, 56) : Color.new(176, 184, 192)))
+    if sel == pool.length
+      o.fill_rect(x0 + 57, dy - 3, x1 - x0 - 113, 3, orange)
+      o.fill_rect(x0 + 57, dy + 26, x1 - x0 - 113, 3, orange)
+      o.fill_rect(x0 + 57, dy - 3, 3, 32, orange)
+      o.fill_rect(x1 - 59, dy - 3, 3, 32, orange)
+    end
+    kifer_px(o, x0 + 62, dy + 2, x1 - x0 - 123, 22, _INTL("Done"), white,
+             full ? Color.new(40, 96, 48) : (over ? Color.new(120, 32, 24) : Color.new(120, 128, 136)), :text, 2)
+    pbSetSystemFont(o)
+    return pages
   end
 
   #-----------------------------------------------------------------------------
