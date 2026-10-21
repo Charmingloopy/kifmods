@@ -704,7 +704,7 @@ def pbPlayAlphaEvolveAnimation(battler, new_species)
   pkmnSprite = @scene.sprites["pokemon_#{battler.index}"]
   return if pkmnSprite.nil? || pkmnSprite.bitmap.nil?
 
-  path = "Graphics/Animations/AlphaEvolve"
+  path = "Mods/alpha_encounters/Graphics/AlphaEvolve"
   return if !FileTest.exist?("#{path}.png") && !FileTest.exist?("#{path}.gif")
 
   sheet = Bitmap.new(path)

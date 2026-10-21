@@ -1,4 +1,4 @@
-{"name":"Alpha Encounters","id":"alpha_encounters","version":"1.0.0","author":"CharmingLoopy","description":"Adds catchable alpha pokemon.","tags":["Difficulty","Gameplay","Content"],"dependencies":[],"incompatible":[],
+{"name":"Alpha Encounters","id":"alpha_encounters","version":"1.5.0","author":"CharmingLoopy","description":"Adds catchable alpha pokemon.","tags":["Difficulty","Gameplay","Content"],"dependencies":[],"incompatible":[],
     "settings": [
     {
       "key": "alpha_encounterchance",
