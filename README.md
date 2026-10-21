@@ -1,6 +1,6 @@
-# KIF Beta Mods
+# KIF Mods (cody-png)
 
-Mods for KIF Beta. Install them in the game: Options > Mods > Browse (KIF Beta Mods).
+KIF's own mods. Install them in the game: Options > Mods > Browse (KIF Mods (cody-png)).
 
 One folder per mod, each with its mod.json. Modpacks go in modpacks/<name>/modpack.json.
 
