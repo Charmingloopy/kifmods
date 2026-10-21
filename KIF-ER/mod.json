@@ -1,0 +1,11 @@
+{
+  "id": "kif_er",
+  "name": "KIF: Elite Redux",
+  "version": "0.6.6",
+  "author": "codydotpng",
+  "description": "Elite Redux conversion for KIF: innates, choice abilities, all Elite Redux abilities and battle mechanics.",
+  "credits": ["Innate and ability data from Pokemon Elite Redux (Elite Redux team)."],
+  "scripts": ["main.rb"],
+  "dependencies": [],
+  "enabled": true
+}

@@ -1,0 +1,11 @@
+{
+  "id": "diff_dupes",
+  "name": "Differentiating Duplicates",
+  "version": "0.6.0",
+  "author": "codydotpng",
+  "description": "Moves and abilities that did the exact same thing now each have their own small twist.",
+  "credits": ["Many ideas from x_bell's video \"Differentiating Duplicate Pokemon Mechanics\"."],
+  "scripts": ["main.rb"],
+  "dependencies": [],
+  "enabled": true
+}
